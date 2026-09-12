@@ -51,13 +51,23 @@ let memos = [];
 // 데이터가 바뀔 때마다(내가 쓰거나 지울 때, 다른 사람이 쓰거나 지울 때) 자동으로 다시 그립니다.
 function loadMemos() {
   const q = query(memosCol, orderBy("createdAt"));
-  onSnapshot(q, function (snapshot) {
-    memos = snapshot.docs.map(function (docSnap) {
-      const data = docSnap.data();
-      return { id: docSnap.id, text: data.text, createdAt: data.createdAt };
-    });
-    render();
-  });
+  onSnapshot(
+    q,
+    function (snapshot) {
+      memos = snapshot.docs.map(function (docSnap) {
+        const data = docSnap.data();
+        return { id: docSnap.id, text: data.text, createdAt: data.createdAt };
+      });
+      render();
+    },
+    function (error) {
+      // 여기로 오면 대부분 Firestore 콘솔 설정 문제입니다.
+      // - "permission-denied": Firestore 규칙이 읽기/쓰기를 막고 있음
+      // - "not-found": Firestore 데이터베이스 자체를 아직 만들지 않았음
+      console.error("메모를 읽어오지 못했습니다:", error);
+      alert("메모를 불러오지 못했습니다. (" + error.code + ")\n콘솔(F12)을 확인해 주세요.");
+    }
+  );
 }
 
 // 메모를 새로 씁니다.
@@ -66,13 +76,19 @@ function addMemo(text) {
   addDoc(memosCol, {
     text: text,
     createdAt: Date.now()
+  }).catch(function (error) {
+    console.error("메모를 저장하지 못했습니다:", error);
+    alert("메모를 저장하지 못했습니다. (" + error.code + ")\n콘솔(F12)을 확인해 주세요.");
   });
 }
 
 // 메모를 지웁니다.
 // 백엔드 2: 지금은 누구든 남의 메모를 지울 수 있습니다. 이걸 막는 것이 과제입니다.
 function deleteMemo(id) {
-  deleteDoc(doc(db, "memos", id));
+  deleteDoc(doc(db, "memos", id)).catch(function (error) {
+    console.error("메모를 지우지 못했습니다:", error);
+    alert("메모를 지우지 못했습니다. (" + error.code + ")\n콘솔(F12)을 확인해 주세요.");
+  });
 }
 
 

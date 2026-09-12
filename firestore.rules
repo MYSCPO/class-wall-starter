@@ -1,0 +1,43 @@
+// ===================================================
+// Firestore 보안 규칙
+//
+// 이 프로젝트는 Firebase CLI로 배포하지 않으므로,
+// 이 파일 내용을 그대로 복사해서
+// Firebase 콘솔 → Firestore Database → 규칙(Rules) 탭에 붙여넣고 "게시"하세요.
+//
+// app.js 의 TEACHER_UIDS 배열과 아래 teacherUids 목록을 항상 똑같이 유지하세요.
+// (app.js 쪽은 화면(버튼 표시)만 담당하고, 실제 권한은 이 규칙이 강제합니다.)
+// ===================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function teacherUids() {
+      return [
+        // "여기에_교사_UID_붙여넣기"
+      ];
+    }
+
+    function isTeacher() {
+      return request.auth != null && request.auth.uid in teacherUids();
+    }
+
+    function isOwner() {
+      return request.auth != null
+        && request.resource.data.uid == request.auth.uid;
+    }
+
+    match /memos/{memoId} {
+      // 담벼락은 누구나 볼 수 있습니다.
+      allow read: if true;
+
+      // 교사는 아무 메모나 쓸 수 있고,
+      // 학생은 로그인한 본인 uid로만 새 메모를 쓸 수 있습니다.
+      allow create: if isTeacher() || isOwner();
+
+      // 수정·삭제는 교사만 할 수 있습니다. 학생은 자기 메모도 고치거나 지울 수 없습니다.
+      allow update, delete: if isTeacher();
+    }
+  }
+}

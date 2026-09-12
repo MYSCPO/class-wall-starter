@@ -43,6 +43,20 @@ const googleProvider = new GoogleAuthProvider();
 // 메모가 저장되는 컬렉션
 const memosCol = collection(db, "memos");
 
+// --- 교사 UID 목록 ---
+// 여기 적힌 uid로 로그인하면 "교사"로, 그 외에는 모두 "학생"으로 취급합니다.
+// Firestore 규칙에도 똑같은 목록이 들어가 있어야 실제로 권한이 적용됩니다. (firestore.rules 참고)
+//
+// 내 uid 찾는 법: 구글로 한 번 로그인한 뒤,
+// Firebase 콘솔 → Authentication → Users 탭에서 이메일 옆 "사용자 UID"를 복사하세요.
+const TEACHER_UIDS = [
+  // "여기에_교사_UID_붙여넣기"
+];
+
+function isTeacher(user) {
+  return !!user && TEACHER_UIDS.includes(user.uid);
+}
+
 
 // --- 메모 목록 ---
 // Firestore와 실시간으로 동기화되는 화면용 캐시입니다.
@@ -78,8 +92,9 @@ function renderUserArea() {
   userArea.innerHTML = "";
 
   if (currentUser) {
+    const role = isTeacher(currentUser) ? "교사" : "학생";
     const name = document.createElement("span");
-    name.textContent = (currentUser.displayName || currentUser.email) + "님 ";
+    name.textContent = (currentUser.displayName || currentUser.email) + "님 (" + role + ") ";
     userArea.appendChild(name);
 
     const logoutBtn = document.createElement("button");
@@ -140,7 +155,7 @@ function loadMemos() {
 }
 
 // 메모를 새로 씁니다.
-// 누가 썼는지(uid)를 함께 저장해서, 나중에 본인 메모만 지울 수 있게 합니다.
+// 누가 썼는지(uid)를 함께 저장합니다. 학생은 이 uid가 자기 것이어야만 쓸 수 있습니다.
 function addMemo(text) {
   if (!currentUser) {
     alert("로그인 후 메모를 쓸 수 있습니다.");
@@ -157,9 +172,7 @@ function addMemo(text) {
   });
 }
 
-// 메모를 지웁니다.
-// 화면에는 본인 메모에만 × 버튼이 보이지만, 실제로 막으려면
-// Firestore 규칙에도 "글쓴이만 삭제 가능" 조건을 넣어야 합니다.
+// 메모를 지웁니다. (교사만 가능 - Firestore 규칙에서도 강제합니다)
 function deleteMemo(id) {
   deleteDoc(doc(db, "memos", id)).catch(function (error) {
     console.error("메모를 지우지 못했습니다:", error);
@@ -186,8 +199,8 @@ function makeMemo(memo) {
   const div = document.createElement("div");
   div.className = "memo";
 
-  // 내가 쓴 메모에만 삭제 버튼을 보여줍니다.
-  if (currentUser && memo.uid === currentUser.uid) {
+  // 삭제는 교사만 할 수 있습니다. 학생은 자기 메모라도 지울 권한이 없습니다.
+  if (isTeacher(currentUser)) {
     const del = document.createElement("button");
     del.textContent = "×";
     del.addEventListener("click", function () {
